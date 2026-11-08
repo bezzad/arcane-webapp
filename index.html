@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Reminder</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  body { margin: 0; padding: 16px; font: 16px system-ui, sans-serif;
+         background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
+  h3 { margin: 18px 0 8px; font-size: 15px; color: var(--tg-theme-hint-color, #888); font-weight: 500; }
+  textarea, input { width: 100%; box-sizing: border-box; font: inherit; padding: 10px; border-radius: 10px;
+                    border: 1px solid var(--tg-theme-hint-color, #ccc); color: inherit;
+                    background: var(--tg-theme-secondary-bg-color, #f2f2f2); }
+  textarea { min-height: 70px; resize: vertical; }
+  input[type=time] { font-size: 24px; text-align: center; direction: ltr; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 18px; border: 0;
+                  background: var(--tg-theme-secondary-bg-color, #eee); color: inherit; }
+  .chips button.on { background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); }
+  #sum { margin-top: 20px; padding: 12px; border-radius: 10px; text-align: center;
+         background: var(--tg-theme-secondary-bg-color, #f2f2f2); }
+  #save { display: none; width: 100%; margin-top: 12px; padding: 12px; font: inherit; border: 0; border-radius: 10px;
+          background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); }
+</style>
+</head>
+<body>
+<div id="textBox">
+  <h3>📝 یادداشت</h3>
+  <textarea id="text" dir="auto" placeholder="مثلاً: زنگ به علی درباره MR"></textarea>
+</div>
+<h3>⚡ سریع</h3>
+<div class="chips" id="quick"></div>
+<h3>📅 روز</h3>
+<div class="chips" id="days"></div>
+<h3>🕐 ساعت</h3>
+<input type="time" id="time">
+<h3>🔁 تکرار</h3>
+<div class="chips" id="repeat"></div>
+<div id="sum"></div>
+<button id="save">ذخیره</button>
+<script>
+// Answers the bot with sendData: {"text" or "id", "due": "YYYY-MM-DD HH:MM", "repeat": ""|day|work|week|month}
+const tg = window.Telegram && Telegram.WebApp;
+const id = new URLSearchParams(location.search).get("id");
+const MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
+const WEEK = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
+const REPEATS = [["", "یک بار"], ["day", "هر روز"], ["work", "روزهای کاری"], ["week", "هر هفته"], ["month", "هر ماه"]];
+const fa = s => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
+const pad = n => String(n).padStart(2, "0");
+
+function jalali(d) {  // same as jalali() in bin/arcane-bot
+  const gy = d.getFullYear(), gm = d.getMonth() + 1, gd = d.getDate(), gy2 = gm > 2 ? gy + 1 : gy;
+  let days = 355666 + 365 * gy + Math.floor((gy2 + 3) / 4) - Math.floor((gy2 + 99) / 100)
+    + Math.floor((gy2 + 399) / 400) + gd + [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334][gm - 1];
+  let jy = -1595 + 33 * Math.floor(days / 12053);
+  days %= 12053; jy += 4 * Math.floor(days / 1461); days %= 1461;
+  if (days > 365) { jy += Math.floor((days - 1) / 365); days = (days - 1) % 365; }
+  return days < 186 ? [jy, 1 + Math.floor(days / 31), 1 + days % 31]
+                    : [jy, 7 + Math.floor((days - 186) / 30), 1 + (days - 186) % 30];
+}
+
+const today = new Date(); today.setHours(0, 0, 0, 0);
+const dayAt = n => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
+let day = 0, repeat = "";
+
+function dayName(n) {
+  const d = dayAt(n), [, jm, jd] = jalali(d);
+  return (n === 0 ? "امروز" : n === 1 ? "فردا" : WEEK[d.getDay()]) + " " + fa(jd) + " " + MONTHS[jm - 1];
+}
+
+function chips(box, items, onTap) {
+  box.innerHTML = "";
+  items.forEach(([key, label]) => {
+    const b = document.createElement("button");
+    b.textContent = label; b.dataset.key = key;
+    b.onclick = () => { onTap(key); render(); };
+    box.appendChild(b);
+  });
+}
+
+function due() {
+  const [h, m] = (timeBox.value || "09:00").split(":").map(Number), d = dayAt(day);
+  d.setHours(h, m); return d;
+}
+
+function render() {
+  for (const b of daysBox.children) b.classList.toggle("on", Number(b.dataset.key) === day);
+  for (const b of repeatBox.children) b.classList.toggle("on", b.dataset.key === repeat);
+  const d = due(), ok = d > new Date() && (id || textBox.value.trim());
+  sum.textContent = "⏰ " + dayName(day) + " · " + fa(timeBox.value) + " · 🔁 " + REPEATS.find(r => r[0] === repeat)[1]
+    + (d > new Date() ? "" : " (گذشته!)");
+  if (tg && tg.initData) ok ? tg.MainButton.enable() : tg.MainButton.disable();
+  else { saveBtn.style.display = "block"; saveBtn.disabled = !ok; }
+}
+
+function send() {
+  const d = due();
+  if (d <= new Date() || !(id || textBox.value.trim())) return;
+  const data = {due: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, repeat};
+  if (id) data.id = Number(id); else data.text = textBox.value.trim();
+  if (tg && tg.initData) tg.sendData(JSON.stringify(data)); else alert(JSON.stringify(data));
+}
+
+const textBox = document.getElementById("text"), timeBox = document.getElementById("time"),
+      daysBox = document.getElementById("days"), repeatBox = document.getElementById("repeat"),
+      sum = document.getElementById("sum"), saveBtn = document.getElementById("save");
+if (id) document.getElementById("textBox").style.display = "none";
+const next = new Date(Date.now() + 3600e3);
+timeBox.value = pad(next.getHours()) + ":00";
+day = next.getHours() === 0 ? 1 : 0;
+chips(daysBox, Array.from({length: 14}, (_, n) => [n, dayName(n)]), n => day = Number(n));
+chips(repeatBox, REPEATS, r => repeat = r);
+chips(document.getElementById("quick"), [["30", "۳۰ دقیقه بعد"], ["60", "۱ ساعت بعد"], ["180", "۳ ساعت بعد"],
+                                          ["tom", "فردا ۹:۰۰"]], k => {
+  if (k === "tom") { day = 1; timeBox.value = "09:00"; return; }
+  const t = new Date(Date.now() + Number(k) * 60e3);
+  day = Math.round((new Date(t).setHours(0, 0, 0, 0) - today) / 864e5);
+  timeBox.value = pad(t.getHours()) + ":" + pad(t.getMinutes());
+});
+textBox.oninput = timeBox.oninput = render;
+saveBtn.onclick = send;
+if (tg && tg.initData) {
+  tg.ready(); tg.expand();
+  tg.MainButton.setText("ذخیره"); tg.MainButton.show(); tg.MainButton.onClick(send);
+}
+render();
+if (!id) textBox.focus();
+</script>
+</body>
+</html>
