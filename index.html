@@ -2,62 +2,87 @@
 <html lang="fa" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Reminder</title>
 <style>
-  body { margin: 0; padding: 16px; font: 16px system-ui, sans-serif;
-         background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
-  h3 { margin: 18px 0 8px; font-size: 15px; color: var(--tg-theme-hint-color, #888); font-weight: 500; }
-  textarea, input { width: 100%; box-sizing: border-box; font: inherit; padding: 10px; border-radius: 10px;
-                    border: 1px solid var(--tg-theme-hint-color, #ccc); color: inherit;
-                    background: var(--tg-theme-secondary-bg-color, #f2f2f2); }
-  textarea { min-height: 70px; resize: vertical; }
-  input[type=time] { font-size: 24px; text-align: center; direction: ltr; }
-  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chips button { font: inherit; font-size: 14px; padding: 8px 12px; border-radius: 18px; border: 0;
-                  background: var(--tg-theme-secondary-bg-color, #eee); color: inherit; }
-  .chips button.on { background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); }
-  #sum { margin-top: 20px; padding: 12px; border-radius: 10px; text-align: center;
-         background: var(--tg-theme-secondary-bg-color, #f2f2f2); }
-  #save { width: 100%; margin-top: 12px; padding: 12px; font: inherit; border: 0; border-radius: 10px;
-          background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); }
+  :root { --bg: #fff; --text: #111; --hint: #8a8f98; --card: #f1f3f6; --accent: #2481cc; --accent-text: #fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #17212b; --text: #f5f5f5; --hint: #708499; --card: #232e3c; --accent: #5288c1; }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body { display: flex; flex-direction: column; gap: 10px; padding: 12px 12px calc(12px + env(safe-area-inset-bottom));
+         height: 100dvh; overflow: hidden; font: 15px/1.3 system-ui, -apple-system, "Vazirmatn", sans-serif;
+         background: var(--bg); color: var(--text); user-select: none; }
+  button { font: inherit; color: inherit; border: 0; cursor: pointer; }
+  .card { background: var(--card); border-radius: 14px; }
+  #text { width: 100%; font: inherit; color: inherit; padding: 12px; border: 0; outline: 0; resize: none; height: 48px; background: transparent;
+          user-select: text; }
+  .row { display: flex; gap: 6px; }
+  .row button { flex: 1; padding: 9px 2px; border-radius: 10px; background: var(--card); font-size: 13px; white-space: nowrap; }
+  .on { background: var(--accent) !important; color: var(--accent-text) !important; }
+  #cal { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 8px; }
+  #calHead { display: flex; align-items: center; justify-content: space-between; padding: 0 4px 6px; font-weight: 600; }
+  #calHead button { background: none; font-size: 22px; width: 36px; height: 30px; color: var(--accent); }
+  #grid { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: 1fr; gap: 2px; min-height: 0; }
+  #grid div { display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--hint); }
+  #grid button { background: none; border-radius: 10px; font-size: 15px; }
+  #grid button:disabled { color: var(--hint); opacity: .45; }
+  #grid button.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  #grid button.fri { color: #e5534b; }
+  #time { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px; direction: ltr; }
+  #time button { width: 40px; height: 40px; border-radius: 50%; background: var(--bg); font-size: 20px; color: var(--accent); }
+  #time span { font-size: 28px; font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+  #save { padding: 14px; border-radius: 12px; background: var(--accent); color: var(--accent-text); font-weight: 600; font-size: 16px; }
+  #save:disabled { opacity: .5; }
+  #sum { text-align: center; font-size: 13px; color: var(--hint); min-height: 17px; }
+  #ver { position: fixed; left: 6px; bottom: 2px; font-size: 9px; color: var(--hint); }
 </style>
 </head>
 <body>
-<div id="textBox">
-  <h3>📝 یادداشت</h3>
-  <textarea id="text" dir="auto" placeholder="مثلاً: زنگ به علی درباره MR"></textarea>
+<div class="card" id="textBox"><textarea id="text" dir="auto" placeholder="📝 یادداشت… مثلاً: زنگ به علی درباره MR"></textarea></div>
+<div class="row" id="quick"></div>
+<div class="card" id="cal">
+  <div id="calHead"><button id="prev">›</button><span id="month"></span><button id="next">‹</button></div>
+  <div id="grid"></div>
 </div>
-<h3>⚡ سریع</h3>
-<div class="chips" id="quick"></div>
-<h3>📅 روز</h3>
-<div class="chips" id="days"></div>
-<h3>🕐 ساعت</h3>
-<input type="time" id="time">
-<h3>🔁 تکرار</h3>
-<div class="chips" id="repeat"></div>
+<div class="card" id="time">
+  <button data-s="-60">−</button><span id="hh"></span><button data-s="60">+</button>
+  <b>:</b>
+  <button data-s="-15">−</button><span id="mm"></span><button data-s="15">+</button>
+</div>
+<div class="row" id="repeat"></div>
 <div id="sum"></div>
 <button id="save">ذخیره</button>
+<div id="ver">v3</div>
 <script>
-// Answers the bot with sendData: {"text" or "id", "due": "YYYY-MM-DD HH:MM", "repeat": ""|day|work|week|month}
-// No telegram-web-app.js: it loads from telegram.org (blocked on some networks, and it blocked the page).
-// These few lines are the part of it we need: post an event to the Telegram app.
+// Answers the bot through Telegram: {"text" or "id", "due": "YYYY-MM-DD HH:MM", "repeat": ""|day|work|week|month}
+// No telegram-web-app.js (it loads from telegram.org, blocked on some networks): we post the event ourselves.
 const hash = new URLSearchParams(location.hash.slice(1));
 const inTg = Boolean(window.TelegramWebviewProxy || hash.get("tgWebAppPlatform"));
 function postEvent(type, data) {
   if (window.TelegramWebviewProxy) TelegramWebviewProxy.postEvent(type, JSON.stringify(data || {}));
   else window.parent.postMessage(JSON.stringify({eventType: type, eventData: data || {}}), "*");
 }
-try {  // Telegram's colors
-  const theme = JSON.parse(hash.get("tgWebAppThemeParams") || "{}");
-  for (const k in theme) document.documentElement.style.setProperty("--tg-theme-" + k.replace(/_/g, "-"), theme[k]);
+try {
+  const t = JSON.parse(hash.get("tgWebAppThemeParams") || "{}"), css = document.documentElement.style;
+  if (t.bg_color) css.setProperty("--bg", t.bg_color);
+  if (t.text_color) css.setProperty("--text", t.text_color);
+  if (t.hint_color) css.setProperty("--hint", t.hint_color);
+  if (t.secondary_bg_color) css.setProperty("--card", t.secondary_bg_color);
+  if (t.button_color) css.setProperty("--accent", t.button_color);
+  if (t.button_text_color) css.setProperty("--accent-text", t.button_text_color);
 } catch (e) {}
+
+const $ = id => document.getElementById(id);
 const id = new URLSearchParams(location.search).get("id");
 const MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
-const WEEK = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
-const REPEATS = [["", "یک بار"], ["day", "هر روز"], ["work", "روزهای کاری"], ["week", "هر هفته"], ["month", "هر ماه"]];
+const WEEK = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
+const REPEATS = [["", "یک بار"], ["day", "روزانه"], ["work", "روز کاری"], ["week", "هفتگی"], ["month", "ماهانه"]];
+const QUICK = [["30", "۳۰ دقیقه"], ["60", "۱ ساعت"], ["180", "۳ ساعت"], ["tom", "فردا ۹"]];
 const fa = s => String(s).replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d]);
 const pad = n => String(n).padStart(2, "0");
+const DAY = 864e5;
 
 function jalali(d) {  // same as jalali() in bin/arcane-bot
   const gy = d.getFullYear(), gm = d.getMonth() + 1, gd = d.getDate(), gy2 = gm > 2 ? gy + 1 : gy;
@@ -70,68 +95,92 @@ function jalali(d) {  // same as jalali() in bin/arcane-bot
                     : [jy, 7 + Math.floor((days - 186) / 30), 1 + (days - 186) % 30];
 }
 
-const today = new Date(); today.setHours(0, 0, 0, 0);
-const dayAt = n => new Date(today.getFullYear(), today.getMonth(), today.getDate() + n);
-let day = 0, repeat = "";
-
-function dayName(n) {
-  const d = dayAt(n), [, jm, jd] = jalali(d);
-  return (n === 0 ? "امروز" : n === 1 ? "فردا" : WEEK[d.getDay()]) + " " + fa(jd) + " " + MONTHS[jm - 1];
+function firstOfMonth(jy, jm) {  // Gregorian date of Jalali jy/jm/1
+  let d = new Date(jy + 621, 2, 21 + (jm <= 7 ? (jm - 1) * 31 : 186 + (jm - 7) * 30));
+  for (let i = 0; i < 5 && jalali(d)[2] !== 1; i++) d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + (jalali(d)[2] > 15 ? 1 : -1));
+  return d;
 }
 
-function chips(box, items, onTap) {
+const today = new Date(); today.setHours(0, 0, 0, 0);
+let sel = new Date(Date.now() + 3600e3), view, repeat = "", quick = "";
+sel.setMinutes(0, 0, 0);
+view = jalali(sel).slice(0, 2);
+
+function renderCal() {
+  const [jy, jm] = view, first = firstOfMonth(jy, jm), selDay = new Date(sel).setHours(0, 0, 0, 0);
+  $("month").textContent = MONTHS[jm - 1] + " " + fa(jy);
+  const grid = $("grid"); grid.innerHTML = "";
+  WEEK.forEach(w => { const c = document.createElement("div"); c.textContent = w; grid.appendChild(c); });
+  for (let i = 0; i < (first.getDay() + 1) % 7; i++) grid.appendChild(document.createElement("div"));
+  for (let d = new Date(first); jalali(d)[1] === jm; d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    const b = document.createElement("button"), day = new Date(d);
+    b.textContent = fa(jalali(d)[2]);
+    b.disabled = d < today;
+    b.classList.toggle("today", +d === +today);
+    b.classList.toggle("fri", d.getDay() === 5);
+    b.classList.toggle("on", +d === selDay);
+    b.onclick = () => { sel.setFullYear(day.getFullYear(), day.getMonth(), day.getDate()); quick = ""; render(); };
+    grid.appendChild(b);
+  }
+  $("prev").disabled = jy * 12 + jm <= jalali(today)[0] * 12 + jalali(today)[1];
+}
+
+function chips(box, items, isOn, onTap) {
   box.innerHTML = "";
   items.forEach(([key, label]) => {
     const b = document.createElement("button");
-    b.textContent = label; b.dataset.key = key;
+    b.textContent = label;
+    b.classList.toggle("on", isOn(key));
     b.onclick = () => { onTap(key); render(); };
     box.appendChild(b);
   });
 }
 
-function due() {
-  const [h, m] = (timeBox.value || "09:00").split(":").map(Number), d = dayAt(day);
-  d.setHours(h, m); return d;
+function dayName(d) {
+  const n = Math.round((new Date(d).setHours(0, 0, 0, 0) - today) / DAY), [, jm, jd] = jalali(d);
+  return n === 0 ? "امروز" : n === 1 ? "فردا" : fa(jd) + " " + MONTHS[jm - 1];
 }
 
 function render() {
-  for (const b of daysBox.children) b.classList.toggle("on", Number(b.dataset.key) === day);
-  for (const b of repeatBox.children) b.classList.toggle("on", b.dataset.key === repeat);
-  const d = due(), ok = d > new Date() && (id || textBox.value.trim());
-  sum.textContent = "⏰ " + dayName(day) + " · " + fa(timeBox.value) + " · 🔁 " + REPEATS.find(r => r[0] === repeat)[1]
-    + (d > new Date() ? "" : " (گذشته!)");
-  saveBtn.disabled = !ok;
+  renderCal();
+  chips($("quick"), QUICK, k => k === quick, k => {
+    quick = k;
+    if (k === "tom") { sel = new Date(today.getTime() + DAY); sel.setHours(9); }
+    else { sel = new Date(Date.now() + Number(k) * 60e3); sel.setSeconds(0, 0); }
+    view = jalali(sel).slice(0, 2);
+  });
+  chips($("repeat"), REPEATS, r => r === repeat, r => repeat = r);
+  $("hh").textContent = fa(pad(sel.getHours()));
+  $("mm").textContent = fa(pad(sel.getMinutes()));
+  const future = sel > new Date();
+  $("sum").textContent = future ? "⏰ " + dayName(sel) + " ساعت " + fa(pad(sel.getHours()) + ":" + pad(sel.getMinutes()))
+    + (repeat ? " · 🔁 " + REPEATS.find(r => r[0] === repeat)[1] : "") : "⚠️ این زمان گذشته است";
+  $("save").disabled = !future || !(id || $("text").value.trim());
 }
 
 function send() {
-  const d = due();
-  if (d <= new Date() || !(id || textBox.value.trim())) return;
-  const data = {due: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, repeat};
-  if (id) data.id = Number(id); else data.text = textBox.value.trim();
-  if (inTg) postEvent("web_app_data_send", {data: JSON.stringify(data)}); else alert(JSON.stringify(data));
+  const s = sel, data = {due: `${s.getFullYear()}-${pad(s.getMonth() + 1)}-${pad(s.getDate())} ${pad(s.getHours())}:${pad(s.getMinutes())}`, repeat};
+  if (id) data.id = Number(id); else data.text = $("text").value.trim();
+  if (!inTg) return alert("Not inside Telegram:\n" + JSON.stringify(data));
+  $("save").textContent = "در حال ارسال…";
+  postEvent("web_app_data_send", {data: JSON.stringify(data)});  // Telegram closes the page on success
+  setTimeout(() => { $("save").textContent = "ذخیره"; $("sum").textContent =
+    "⚠️ تلگرام داده را نگرفت. صفحه را ببند و از دکمه ⏰ Reminder پایین چت دوباره باز کن."; }, 2500);
 }
 
-const textBox = document.getElementById("text"), timeBox = document.getElementById("time"),
-      daysBox = document.getElementById("days"), repeatBox = document.getElementById("repeat"),
-      sum = document.getElementById("sum"), saveBtn = document.getElementById("save");
-if (id) document.getElementById("textBox").style.display = "none";
-const next = new Date(Date.now() + 3600e3);
-timeBox.value = pad(next.getHours()) + ":00";
-day = next.getHours() === 0 ? 1 : 0;
-chips(daysBox, Array.from({length: 14}, (_, n) => [n, dayName(n)]), n => day = Number(n));
-chips(repeatBox, REPEATS, r => repeat = r);
-chips(document.getElementById("quick"), [["30", "۳۰ دقیقه بعد"], ["60", "۱ ساعت بعد"], ["180", "۳ ساعت بعد"],
-                                          ["tom", "فردا ۹:۰۰"]], k => {
-  if (k === "tom") { day = 1; timeBox.value = "09:00"; return; }
-  const t = new Date(Date.now() + Number(k) * 60e3);
-  day = Math.round((new Date(t).setHours(0, 0, 0, 0) - today) / 864e5);
-  timeBox.value = pad(t.getHours()) + ":" + pad(t.getMinutes());
+// time: − / + by one hour or 15 minutes (minutes snap to :00 :15 :30 :45)
+document.querySelectorAll("[data-s]").forEach(b => b.onclick = () => {
+  const step = Number(b.dataset.s), m = sel.getMinutes();
+  sel = new Date(sel.getTime() + (step === 15 || step === -15 ? (step > 0 ? 15 - m % 15 : -(m % 15 || 15)) : step) * 60e3);
+  quick = ""; view = jalali(sel).slice(0, 2); render();
 });
-textBox.oninput = timeBox.oninput = render;
-saveBtn.onclick = send;
+$("prev").onclick = () => { view = view[1] === 1 ? [view[0] - 1, 12] : [view[0], view[1] - 1]; renderCal(); };
+$("next").onclick = () => { view = view[1] === 12 ? [view[0] + 1, 1] : [view[0], view[1] + 1]; renderCal(); };
+$("text").oninput = render;
+$("save").onclick = send;
+if (id) $("textBox").style.display = "none";
 if (inTg) { postEvent("web_app_ready"); postEvent("web_app_expand"); }
 render();
-if (!id) textBox.focus();
 </script>
 </body>
 </html>
