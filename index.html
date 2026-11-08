@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>Reminder</title>
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
   body { margin: 0; padding: 16px; font: 16px system-ui, sans-serif;
          background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
@@ -20,7 +19,7 @@
   .chips button.on { background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); }
   #sum { margin-top: 20px; padding: 12px; border-radius: 10px; text-align: center;
          background: var(--tg-theme-secondary-bg-color, #f2f2f2); }
-  #save { display: none; width: 100%; margin-top: 12px; padding: 12px; font: inherit; border: 0; border-radius: 10px;
+  #save { width: 100%; margin-top: 12px; padding: 12px; font: inherit; border: 0; border-radius: 10px;
           background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); }
 </style>
 </head>
@@ -41,7 +40,18 @@
 <button id="save">ذخیره</button>
 <script>
 // Answers the bot with sendData: {"text" or "id", "due": "YYYY-MM-DD HH:MM", "repeat": ""|day|work|week|month}
-const tg = window.Telegram && Telegram.WebApp;
+// No telegram-web-app.js: it loads from telegram.org (blocked on some networks, and it blocked the page).
+// These few lines are the part of it we need: post an event to the Telegram app.
+const hash = new URLSearchParams(location.hash.slice(1));
+const inTg = Boolean(window.TelegramWebviewProxy || hash.get("tgWebAppPlatform"));
+function postEvent(type, data) {
+  if (window.TelegramWebviewProxy) TelegramWebviewProxy.postEvent(type, JSON.stringify(data || {}));
+  else window.parent.postMessage(JSON.stringify({eventType: type, eventData: data || {}}), "*");
+}
+try {  // Telegram's colors
+  const theme = JSON.parse(hash.get("tgWebAppThemeParams") || "{}");
+  for (const k in theme) document.documentElement.style.setProperty("--tg-theme-" + k.replace(/_/g, "-"), theme[k]);
+} catch (e) {}
 const id = new URLSearchParams(location.search).get("id");
 const MONTHS = ["فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"];
 const WEEK = ["یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه"];
@@ -90,8 +100,7 @@ function render() {
   const d = due(), ok = d > new Date() && (id || textBox.value.trim());
   sum.textContent = "⏰ " + dayName(day) + " · " + fa(timeBox.value) + " · 🔁 " + REPEATS.find(r => r[0] === repeat)[1]
     + (d > new Date() ? "" : " (گذشته!)");
-  if (tg && tg.initData) ok ? tg.MainButton.enable() : tg.MainButton.disable();
-  else { saveBtn.style.display = "block"; saveBtn.disabled = !ok; }
+  saveBtn.disabled = !ok;
 }
 
 function send() {
@@ -99,7 +108,7 @@ function send() {
   if (d <= new Date() || !(id || textBox.value.trim())) return;
   const data = {due: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`, repeat};
   if (id) data.id = Number(id); else data.text = textBox.value.trim();
-  if (tg && tg.initData) tg.sendData(JSON.stringify(data)); else alert(JSON.stringify(data));
+  if (inTg) postEvent("web_app_data_send", {data: JSON.stringify(data)}); else alert(JSON.stringify(data));
 }
 
 const textBox = document.getElementById("text"), timeBox = document.getElementById("time"),
@@ -120,10 +129,7 @@ chips(document.getElementById("quick"), [["30", "۳۰ دقیقه بعد"], ["60"
 });
 textBox.oninput = timeBox.oninput = render;
 saveBtn.onclick = send;
-if (tg && tg.initData) {
-  tg.ready(); tg.expand();
-  tg.MainButton.setText("ذخیره"); tg.MainButton.show(); tg.MainButton.onClick(send);
-}
+if (inTg) { postEvent("web_app_ready"); postEvent("web_app_expand"); }
 render();
 if (!id) textBox.focus();
 </script>
